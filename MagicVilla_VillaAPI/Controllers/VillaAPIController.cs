@@ -9,10 +9,16 @@ namespace MagicVilla_VillaAPI.Controllers
     [ApiController]
     public class VillaAPIController : ControllerBase
     {
+        private readonly ILogger<VillaAPIController> logger;
+        public VillaAPIController(ILogger<VillaAPIController> _logger)
+        {
+            logger = _logger;
+        }
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<IEnumerable<Villa>> GetVillas()
+        public ActionResult<IEnumerable<Villa>> GetVillas() 
         {
+            logger.Log(LogLevel.Information,"Inside getVillas");
             return Ok(VillaStore.Villas);
         }
         [HttpGet("{id:int}",Name ="GetVilla")]
@@ -39,6 +45,7 @@ namespace MagicVilla_VillaAPI.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public ActionResult<Villa> CreateVilla([FromBody]Villa villa)
         {
+
             if(VillaStore.Villas.FirstOrDefault(x=>x?.Name?.ToLower() == villa?.Name?.ToLower()) != null)
             {
                 ModelState.AddModelError("CustomError", "Villa Already exists");
@@ -48,7 +55,16 @@ namespace MagicVilla_VillaAPI.Controllers
             {
                 return BadRequest();
             }
-            int id = VillaStore.Villas.LastOrDefault().Id;
+            var vill = VillaStore.Villas.LastOrDefault();
+            int id;
+            if (vill == null)
+            {
+                id = 1;
+            }
+            else
+            {
+                id = vill.Id + 1;
+            }
             villa.Id =  id + 1;
             VillaStore.Villas.Add(villa);
             return CreatedAtRoute("GetVilla", new { id = villa.Id }, villa);
