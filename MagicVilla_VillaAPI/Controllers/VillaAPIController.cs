@@ -1,7 +1,10 @@
-﻿using MagicVilla_VillaAPI.Models;
+﻿using MagicVilla_VillaAPI.Data;
+using MagicVilla_VillaAPI.Logging;
+using MagicVilla_VillaAPI.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace MagicVilla_VillaAPI.Controllers
 {
@@ -10,28 +13,30 @@ namespace MagicVilla_VillaAPI.Controllers
     public class VillaAPIController : ControllerBase
     {
         private readonly ILogger<VillaAPIController> logger;
-        public VillaAPIController(ILogger<VillaAPIController> _logger)
+        private readonly AppDbContext db;
+        public VillaAPIController(ILogger<VillaAPIController> _logger,AppDbContext _db)
         {
             logger = _logger;
+            db = _db;
         }
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<IEnumerable<Villa>> GetVillas() 
+        public ActionResult<IEnumerable<VillaDTO>> GetVillas() 
         {
             logger.Log(LogLevel.Information,"Inside getVillas");
-            return Ok(VillaStore.Villas);
+            return Ok(db.Villas.ToList());
         }
         [HttpGet("{id:int}",Name ="GetVilla")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<Villa> GetVilla(int id)
+        public ActionResult<VillaDTO> GetVilla(int id)
         {
             if(id <= 0)
             {
                 return BadRequest();
             }
-            var villa = VillaStore.Villas?.FirstOrDefault(x => x.Id == id);
+            var villa = db.Villas.FirstOrDefault(x => x.Id == id);
             if(villa == null)
             {
                 return NotFound();
@@ -43,31 +48,28 @@ namespace MagicVilla_VillaAPI.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public ActionResult<Villa> CreateVilla([FromBody]Villa villa)
+        public ActionResult<VillaDTO> CreateVilla([FromBody]VillaDTO villaDTO)
         {
 
-            if(VillaStore.Villas.FirstOrDefault(x=>x?.Name?.ToLower() == villa?.Name?.ToLower()) != null)
+            if (db.Villas.FirstOrDefault(x => x.Name.ToLower() == villaDTO.Name.ToLower()) != null)
             {
                 ModelState.AddModelError("CustomError", "Villa Already exists");
                 return BadRequest (ModelState);
             }
-            if(villa == null)
+            if(villaDTO == null)
             {
                 return BadRequest();
             }
-            var vill = VillaStore.Villas.LastOrDefault();
-            int id;
-            if (vill == null)
+            if(villaDTO.Id > 0)
             {
-                id = 1;
+                return StatusCode(StatusCodes.Status500InternalServerError);
             }
-            else
-            {
-                id = vill.Id + 1;
-            }
-            villa.Id =  id + 1;
-            VillaStore.Villas.Add(villa);
-            return CreatedAtRoute("GetVilla", new { id = villa.Id }, villa);
+            Villa villa = villaDTO;
+            villa.CreatedDate = DateTime.Today;
+            villa.UpdatedDate = DateTime.Today;
+            db.Villas.Add(villa);
+            db.SaveChanges();
+            return CreatedAtRoute("GetVilla", new { id = villaDTO.Id }, villaDTO);
         }
         [HttpDelete("{id:int}",Name ="DeleteVilla")]
 
@@ -80,11 +82,11 @@ namespace MagicVilla_VillaAPI.Controllers
             {
                 return BadRequest();
             }
-            var villa = VillaStore.Villas.FirstOrDefault(x=>x.Id == id);
+            var villa = db.Villas.FirstOrDefault(x=>x.Id == id);
             if(villa == null) {
                 return NotFound();
             }
-            VillaStore.Villas.Remove(villa);
+            db.Villas.Remove(villa);
             return NoContent();
         }
 
@@ -92,37 +94,40 @@ namespace MagicVilla_VillaAPI.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult UpdateVilla(int id, [FromBody]Villa Input)
+        public IActionResult UpdateVilla(int id, [FromBody]VillaDTO Input)
         {
             if(Input.Id != id)
             {
                 return BadRequest();
             }
-            var villa = VillaStore.Villas.FirstOrDefault(x => x.Id == id);
+            var villa = db.Villas.AsNoTracking().FirstOrDefault(x => x.Id == id);
             if(villa == null)
             {
                 return NotFound();
             }
-            villa.Name = Input.Name;
-            villa.Ocuupancy = Input.Ocuupancy;
-            villa.SquareFt = Input.SquareFt;
+            villa = Input;
+            villa.UpdatedDate = DateTime.Today;
+            db.Villas.Update(villa);
+            db.SaveChanges();
             return NoContent();
         }
         [HttpPatch("{id:int}",Name ="UpdatePartialVilla")]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        public IActionResult UpdatePartialVilla(int id, JsonPatchDocument<Villa> patch)
+        public IActionResult UpdatePartialVilla(int id, JsonPatchDocument<VillaDTO> patch)
         {
             if(patch == null || id == 0)
             {
                 return BadRequest();
             }
-            var villa = VillaStore.Villas.FirstOrDefault(x => x.Id == id);
+            var villa = db.Villas.AsNoTracking().FirstOrDefault(x => x.Id == id);
             if(villa == null)
             {
                 return BadRequest();
             }
             patch.ApplyTo(villa, ModelState);
+            villa.UpdatedDate = DateTime.Today;
+            db.Villas.Update(villa);
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);

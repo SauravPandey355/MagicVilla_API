@@ -2,9 +2,9 @@
 {
     public static class VillaStore
     {
-        public static List<Villa> Villas = new List<Villa> {
-                new Villa {Id=1,Name="Villa1"},
-                new Villa { Id = 2, Name = "Villa2" }
+        public static List<VillaDTO> Villas = new List<VillaDTO> {
+                new VillaDTO {Id=1,Name="Villa1"},
+                new VillaDTO { Id = 2, Name = "Villa2" }
             };
     }
 }
