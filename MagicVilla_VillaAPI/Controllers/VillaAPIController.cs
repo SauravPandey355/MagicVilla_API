@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
+using System.Net;
 
 namespace MagicVilla_VillaAPI.Controllers
 {
@@ -14,17 +16,26 @@ namespace MagicVilla_VillaAPI.Controllers
     {
         private readonly ILogger<VillaAPIController> logger;
         private readonly AppDbContext db;
+        private APIResponse response;
         public VillaAPIController(ILogger<VillaAPIController> _logger,AppDbContext _db)
         {
             logger = _logger;
             db = _db;
+            this.response = new APIResponse();
         }
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<IEnumerable<VillaDTO>> GetVillas() 
+        public async Task<ActionResult<APIResponse>> GetVillas() 
         {
-            logger.Log(LogLevel.Information,"Inside getVillas");
-            return Ok(db.Villas.ToList());
+            db.Villas.ToList();
+            response.StatusCode = HttpStatusCode.OK;
+            response.Status = "Success";
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+            response.response = await db.Villas.ToListAsync();
+            stopwatch.Stop();
+            response.Message = $"Total time taken by Api is {stopwatch.ElapsedMilliseconds} ms";
+            return Ok(response);
         }
         [HttpGet("{id:int}",Name ="GetVilla")]
         [ProducesResponseType(StatusCodes.Status200OK)]
